@@ -1,0 +1,18 @@
+This is a map of Berlin's exclaves on the border of West and East Germany (from 1949; some ended in 1971, others persisted until 1988 or reunification),
+
+- Wikipedia (EN): https://en.wikipedia.org/wiki/Exclaves_of_West_Berlin_in_East_Germany
+- Wikipedia (DE): https://de.wikipedia.org/wiki/West-Berlin#Exklaven,_die_zum_Stadtgebiet_von_West-Berlin_geh%C3%B6rten
+
+Creating an accurate map today is difficult because smaller exclaves are not visible on a full city-scale map; some were unpopulated or ignored.
+It is easier to map areas which include part of the current Berlin city border (such as Eiskeller).
+
+Some exclaves were traced from [a 1967 CIA map (PDF)](https://www.cia.gov/readingroom/docs/CIA-RDP84-00825R000100670001-2.pdf).
+
+If you can provide more information, please report an Issue: https://github.com/mapmeld/leafhack/issues/new
+
+### Notes
+
+- includes Klein Glienicke (East German "exclave" connected by bridge)
+- includes Eiskeller (West German neighborhood connected by road corridor to West Berlin, sometimes not considered an exclave)
+- most claim three parcels inside Böttcherberg; I see two inside Klein Glienicke
+- does not include East German exclave(s) inside Eiskeller
