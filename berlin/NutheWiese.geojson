@@ -1,1 +1,7 @@
-{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[13.11199340108016,52.37170507587717,0],[13.1141465762012,52.37011556114166,0],[13.11525386237881,52.37015775350891,0],[13.11757093376285,52.37243368156408,0],[13.11561345990406,52.37500809026128,0],[13.11199340108016,52.37170507587717,0]]]},"properties":{"name":"Nuthe Wiese","styleUrl":"#m_ylw-pushpin","icon-scale":1.1,"icon-offset":[20,2],"icon-offset-units":["pixels","pixels"],"icon":"http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png"}}]}
+{
+"type": "FeatureCollection",
+"name": "BerlinFull",
+"features": [
+{ "type": "Feature", "id": "relation/2692239", "properties": { "timestamp": "2025-08-25T11:20:36Z", "version": "12", "changeset": "190302", "user": "Druaga2", "uid": "12642", "admin_level": "3", "boundary": "administrative", "end_date": "1972", "end_date:cause": "1972: Exchanges regarding Berlin exclaves, Steinstücken and Eiskeller", "name": "Westberlin (1949-1972)", "name:en": "West Berlin", "name:ko": "서베를린", "start_date": "1949", "type": "boundary", "wikidata": "Q56036" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 13.114897, 52.3697695 ], [ 13.1168175, 52.3694027 ], [ 13.1165922, 52.3708045 ], [ 13.1171822, 52.3719115 ], [ 13.1161308, 52.3727827 ], [ 13.1151867, 52.3719836 ], [ 13.1147683, 52.3708176 ], [ 13.114897, 52.3697695 ] ] ] ] } }
+]
+}
