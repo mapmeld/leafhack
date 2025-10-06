@@ -1,1 +1,7 @@
-{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[13.04312171900871,52.60174525100534,0],[13.04874114605426,52.59847453433429,0],[13.05824660306236,52.60358266365913,0],[13.05537618684955,52.60440940994339,0],[13.05140890109463,52.60638668346972,0],[13.04312171900871,52.60174525100534,0]]]},"properties":{"name":"Falkenhagener Wiese","styleUrl":"#m_ylw-pushpin","icon-scale":1.1,"icon-offset":[20,2],"icon-offset-units":["pixels","pixels"],"icon":"http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png"}}]}
+{
+"type": "FeatureCollection",
+"name": "berlin2",
+"features": [
+{ "type": "Feature", "id": "relation/2692239", "properties": { "timestamp": "2025-08-25T11:20:36Z", "version": "12", "changeset": "190302", "user": "Druaga2", "uid": "12642", "admin_level": "3", "boundary": "administrative", "end_date": "1972", "end_date:cause": "1972: Exchanges regarding Berlin exclaves, Steinstücken and Eiskeller", "name": "Westberlin (1949-1972)", "name:en": "West Berlin", "name:ko": "서베를린", "start_date": "1949", "type": "boundary", "wikidata": "Q56036" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 13.0433893, 52.6022656 ], [ 13.0448913, 52.6011709 ], [ 13.0449771, 52.6004411 ], [ 13.0473375, 52.5989032 ], [ 13.0576801, 52.604038 ], [ 13.0641603, 52.6033082 ], [ 13.0657911, 52.6036731 ], [ 13.0656194, 52.604038 ], [ 13.0639028, 52.603621 ], [ 13.056693, 52.6045332 ], [ 13.0517149, 52.6066182 ], [ 13.0433893, 52.6022656 ] ] ] ] } }
+]
+}
