@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Multigrain Bread Calculator</title>
+        <style>
+            :root {
+                color-scheme: light;
+                --border: #d0d0d0;
+                --header-bg: #f4f4f4;
+                --accent: #6b4226;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                color: #222;
+                background: #fafafa;
+            }
+
+            h1 {
+                text-align: center;
+                padding: 1rem;
+                margin: 0;
+                background: var(--accent);
+                color: #fff;
+            }
+
+            .columns {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1rem;
+                padding: 1rem;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .column {
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                background: #fff;
+                overflow: hidden;
+            }
+
+            .column > summary {
+                list-style: none;
+                cursor: pointer;
+                padding: 0.75rem 1rem;
+                font-weight: bold;
+                background: var(--header-bg);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .column > summary::-webkit-details-marker {
+                display: none;
+            }
+
+            /* Chevron indicator, only meaningful on mobile where toggling is enabled */
+            .column > summary::after {
+                content: "▸";
+                transition: transform 0.15s ease;
+            }
+
+            .column[open] > summary::after {
+                transform: rotate(90deg);
+            }
+
+            .column-body {
+                padding: 0.75rem 1rem;
+            }
+
+            .column-body ul {
+                margin: 0;
+                padding-left: 1.25rem;
+            }
+
+            .column-body li {
+                margin-bottom: 0.4rem;
+            }
+
+            .ingredient-list label {
+                display: block;
+                margin-bottom: 0.3rem;
+                cursor: pointer;
+            }
+
+            .ingredient-group {
+                margin-bottom: 0.5rem;
+            }
+
+            .ingredient-group .group-label {
+                font-weight: bold;
+            }
+
+            .ingredient-group .group-items {
+                margin-left: 1.25rem;
+                padding-top: 0.2rem;
+            }
+
+            .product {
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                margin-bottom: 0.5rem;
+                overflow: hidden;
+            }
+
+            .grain-count {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: var(--accent);
+                min-width: 2ch;
+                text-align: right;
+            }
+
+            .product-name {
+                flex: 1;
+            }
+
+            .product-total {
+                font-weight: normal;
+                font-size: 0.85em;
+                color: #555;
+            }
+
+            .product > summary {
+                list-style: none;
+                cursor: pointer;
+                padding: 0.5rem 0.75rem;
+                background: #fafafa;
+                display: flex;
+                align-items: baseline;
+                gap: 0.75rem;
+            }
+
+            .product > summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .product > summary::after {
+                content: "+";
+                font-weight: bold;
+                margin-left: auto;
+            }
+
+            .product[open] > summary::after {
+                content: "\2212";
+            }
+
+            .product .ingredients {
+                padding: 0.5rem 0.75rem 0.75rem 1.5rem;
+                margin: 0;
+            }
+
+            /* Desktop: columns are always fully expanded, act as static panels */
+            @media (min-width: 701px) {
+                .column > summary {
+                    cursor: default;
+                    pointer-events: none;
+                }
+            }
+
+            /* Mobile: stack into a collapsible accordion */
+            @media (max-width: 700px) {
+                .columns {
+                    display: block;
+                }
+
+                .column {
+                    margin-bottom: 0.75rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Multigrain Bread Calculator</h1>
+
+        <div class="columns" id="columns">
+            <details class="column" open>
+                <summary>Must Have</summary>
+                <div class="column-body">
+                    <div class="ingredient-list" id="must-have-list" data-prefix="mh"></div>
+                </div>
+            </details>
+
+            <details class="column" open>
+                <summary>Must NOT Have</summary>
+                <div class="column-body">
+                    <div class="ingredient-list" id="must-not-have-list" data-prefix="mn"></div>
+                </div>
+            </details>
+
+            <details class="column" open>
+                <summary>Counts as Grain</summary>
+                <div class="column-body">
+                    <div class="ingredient-list" id="counts-as-grain-list" data-prefix="cg"></div>
+                </div>
+            </details>
+
+            <details class="column" open>
+                <summary>Adjusted Leaderboard</summary>
+                <div class="column-body" id="products-list"></div>
+            </details>
+        </div>
+
+        <script>
+            // Force columns open on desktop (summary click is disabled there via CSS)
+            const columns = document.querySelectorAll(".columns > .column");
+            const desktopQuery = window.matchMedia("(min-width: 701px)");
+
+            function syncColumnState() {
+                columns.forEach((col) => {
+                    if (desktopQuery.matches) {
+                        col.open = true;
+                    }
+                });
+            }
+
+            desktopQuery.addEventListener("change", syncColumnState);
+            syncColumnState();
+
+            // Canonical grain catalog: one checkbox per real-world grain, with every label
+            // seen on a product's ingredient panel listed as an alias underneath it.
+            // Duplicates across products (e.g. "Kamut" and "Khorasan" are the same wheat)
+            // should be merged here into a single entry rather than kept as separate items.
+            var GRAINS = [
+                { name: "Whole Wheat", group: "Wheat", aliases: ["Whole Wheat Flour", "Whole Wheat", "White Whole Wheat", "Whole Grain Wheat", "White Wheat", "Wheat Flour", "Sprouted Wheat Berries", "Sprouted Wheat", "Wheat Berries", "Hard Red Wheat", "Hard White Wheat"] },
+                { name: "Cracked Wheat", group: "Wheat", aliases: ["Cracked Wheat", "Cracked Hard Wheat", "Malted Crushed Wheat"] },
+                { name: "Soft Wheat", group: "Wheat", aliases: ["Soft Wheat", "Soft White Wheat"] },
+                { name: "Red Wheat Bran", group: "Wheat", aliases: ["Red Wheat Bran"] },
+                { name: "Wheat Flakes", group: "Wheat", aliases: ["Wheat Flakes", "Soft White Wheat Flakes"] },
+                { name: "Einkorn Wheat", group: "Wheat", aliases: ["Einkorn Wheat", "Einkorn Wheat Berry"] },
+                { name: "Emmer", group: "Wheat", aliases: ["Emmer", "Farro"] },
+                { name: "Durum Wheat", group: "Wheat", aliases: ["Durum", "Durum Wheat", "Durum Wheat Flour"] },
+                { name: "Spelt", group: "Wheat", aliases: ["Spelt", "Spelt Flakes", "Spelt Flour", "Sprouted Spelt Flour", "Sprouted Spelt", "Spelt Berries"] },
+                {
+                    // Kamut is the trademarked brand name for Khorasan wheat -- same grain
+                    name: "Khorasan Wheat (Kamut)",
+                    group: "Wheat",
+                    aliases: ["Khorasan Flakes", "Khorasan", "Khorasan Wheat", "Khorasan Wheat Flakes", "Kamut", "Kamut [Kharasan]", "Kharasan", "Kamut Khorasan Wheat", "Sprouted Khorasan"]
+                },
+                { name: "Red Fife", group: "Wheat", aliases: ["Red Fife"] },
+                { name: "Triticale", group: "Wheat", aliases: ["Triticale", "Triticale Flakes", "Sprouted Triticale", "Triticale Berries"] },
+
+                { name: "Rye", group: null, aliases: ["Rye", "Rye Flour", "Rye Flakes", "Pumpernickel", "Sprouted Rye", "Rye Berries"] },
+
+                { name: "Oats", group: null, aliases: ["Oat Flakes", "Rolled Oats", "Oats", "Steel Cut Oats", "Oat", "Whole Oat Berries", "Oat Groats"] },
+
+                { name: "Corn", group: null, aliases: ["Corn", "Yellow Corn", "Corn Meal", "Blue Cornmeal", "Purple Corn", "Yellow Cornmeal", "Sprouted Yellow Corn Flour", "Blue Corn", "Sprouted Corn", "Corn Grits"] },
+
+                { name: "Barley", group: null, aliases: ["Barley Flakes", "Barley", "Sprouted Barley", "Malted Barley", "Dehulled Barley"] },
+                { name: "Flax", group: null, aliases: ["Brown Flax Seed", "Brown Flax Seeds", "Flax", "Flax Seeds", "Flax Seed", "Flaxseeds", "Golden Flax", "Flaxseed", "Brown Flaxseed", "Flaxmeal", "Brown Flaxmeal", "Yellow Flaxseed", "Sprouted Flax Seed", "Flaxseed Meal"] },
+                { name: "Buckwheat", group: null, aliases: ["White Buckwheat", "Buckwheat", "Buckwheat Flour", "Buckwheat Groats", "Sprouted Buckwheat"] },
+                { name: "Brown Rice", group: null, aliases: ["Long Grain Brown Rice", "Brown Rice", "Brown Rice Flour", "Sprouted Brown Rice Flour", "Sprouted Brown Rice", "Brown Rice Meal"] },
+                { name: "Sorghum", group: null, aliases: ["Sorghum", "Sorghum Flour", "White Sorghum", "Cracked Sorghum"] },
+                { name: "Teff", group: null, aliases: ["Teff Seed", "Teff", "Sprouted Teff"] },
+                { name: "Amaranth", group: null, aliases: ["Amaranth", "Sprouted Amaranth"] },
+                { name: "Millet", group: null, aliases: ["Millet", "Finger Millet", "Hulled Millet", "Sprouted Millet"] },
+                { name: "Sunflower Seeds", group: null, aliases: ["Sunflower Seeds", "Sunflower Seed", "Sunflower"] },
+                { name: "Sesame Seeds", group: null, aliases: ["Sesame Seeds", "Sesame Seed", "Black Sesame Seed", "Black Sesame Seeds", "White Sesame Seed", "Sesame"] },
+                { name: "Pumpkin Seeds", group: null, aliases: ["Pumpkin Seeds", "Pumpkin Seed"] },
+                { name: "Hemp Seeds", group: null, aliases: ["Hemp Seeds"] },
+                { name: "Chia Seeds", group: null, aliases: ["Chia Seeds", "Chia Seed", "Black Chia Seeds", "Sprouted Chia Seeds"] },
+                { name: "Poppy Seed", group: null, aliases: ["Poppy Seed", "Poppy Seeds", "Poppy"] },
+                { name: "White Quinoa", group: "Quinoa", aliases: ["White Quinoa"] },
+                { name: "Red Quinoa", group: "Quinoa", aliases: ["Red Quinoa"] },
+                { name: "Black Quinoa", group: "Quinoa", aliases: ["Black Quinoa"] },
+                { name: "Quinoa", group: "Quinoa", aliases: ["Quinoa", "Sprouted Quinoa"] },
+                { name: "Kaniwa Seeds", group: null, aliases: ["Kaniwa Seeds"] },
+                { name: "Split Chickpeas", group: null, aliases: ["Split Chickpeas"] },
+                { name: "Soya", group: null, aliases: ["Soya", "Sprouted Soybeans", "Soya Grits"] },
+                { name: "Psyllium Husk", group: null, aliases: ["Psyllium Husk"] },
+                { name: "Almond", group: null, aliases: ["Almond"] },
+                { name: "Arrowroot", group: null, aliases: ["Arrowroot"] },
+                { name: "Coconut", group: null, aliases: ["Coconut"] },
+                { name: "Tapioca", group: null, aliases: ["Tapioca"] }
+            ];
+
+            // Exact-match lookup from any label seen on a package to its canonical grain name
+            var GRAIN_BY_ALIAS = {};
+            GRAINS.forEach(function (grain) {
+                grain.aliases.forEach(function (alias) {
+                    GRAIN_BY_ALIAS[alias.trim().toLowerCase()] = grain.name;
+                });
+            });
+
+            function canonicalGrainName(ingredient) {
+                return GRAIN_BY_ALIAS[ingredient.trim().toLowerCase()] || null;
+            }
+
+            function slugify(text) {
+                return text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            }
+
+            function makeItemLabel(prefix, item, defaultChecked) {
+                var itemId = prefix + "-" + slugify(item);
+                var label = document.createElement("label");
+                var checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = itemId;
+                checkbox.value = item;
+                checkbox.checked = !!defaultChecked;
+                label.htmlFor = itemId;
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(" " + item));
+                return { label: label, checkbox: checkbox };
+            }
+
+            function renderIngredientList(container, defaultChecked) {
+                var prefix = container.dataset.prefix;
+                var groups = {};
+                var groupOrder = [];
+                var ungrouped = [];
+
+                GRAINS.forEach(function (grain) {
+                    if (!grain.group) {
+                        ungrouped.push(grain);
+                        return;
+                    }
+                    if (!groups[grain.group]) {
+                        groups[grain.group] = [];
+                        groupOrder.push(grain.group);
+                    }
+                    groups[grain.group].push(grain);
+                });
+
+                groupOrder.forEach(function (groupName) {
+                    var groupEl = document.createElement("div");
+                    groupEl.className = "ingredient-group";
+
+                    var itemsEl = document.createElement("div");
+                    itemsEl.className = "group-items";
+
+                    var itemCheckboxes = groups[groupName].map(function (grain) {
+                        var built = makeItemLabel(prefix, grain.name, defaultChecked);
+                        itemsEl.appendChild(built.label);
+                        return built.checkbox;
+                    });
+
+                    var groupId = prefix + "-group-" + slugify(groupName);
+                    var groupLabel = document.createElement("label");
+                    groupLabel.className = "group-label";
+                    var groupCheckbox = document.createElement("input");
+                    groupCheckbox.type = "checkbox";
+                    groupCheckbox.id = groupId;
+                    // No value here -- this is a "toggle all" control, not itself a grain term
+                    groupCheckbox.value = "";
+                    groupLabel.htmlFor = groupId;
+                    groupLabel.appendChild(groupCheckbox);
+                    groupLabel.appendChild(document.createTextNode(" " + groupName));
+
+                    groupCheckbox.addEventListener("change", function () {
+                        itemCheckboxes.forEach(function (cb) {
+                            cb.checked = groupCheckbox.checked;
+                        });
+                    });
+
+                    function syncGroupCheckbox() {
+                        var checkedCount = itemCheckboxes.filter(function (cb) {
+                            return cb.checked;
+                        }).length;
+                        groupCheckbox.checked = checkedCount === itemCheckboxes.length;
+                        groupCheckbox.indeterminate = checkedCount > 0 && checkedCount < itemCheckboxes.length;
+                    }
+
+                    itemCheckboxes.forEach(function (cb) {
+                        cb.addEventListener("change", syncGroupCheckbox);
+                    });
+                    syncGroupCheckbox();
+
+                    groupEl.appendChild(groupLabel);
+                    groupEl.appendChild(itemsEl);
+                    container.appendChild(groupEl);
+                });
+
+                ungrouped.forEach(function (grain) {
+                    var built = makeItemLabel(prefix, grain.name, defaultChecked);
+                    container.appendChild(built.label);
+                });
+            }
+
+            document.querySelectorAll("#must-have-list, #must-not-have-list").forEach(function (el) {
+                renderIngredientList(el, false);
+            });
+
+            // Every grain counts by default; uncheck one to exclude it from a product's grain count
+            renderIngredientList(document.getElementById("counts-as-grain-list"), true);
+
+            var products = [
+                {
+                    name: "Wegmans 27 Grain and Seed Bagels",
+                    ingredients: [
+                        "Whole Wheat Flour", "Oat Flakes", "Brown Flax Seed", "Sunflower Seeds",
+                        "Sesame Seeds", "Pumpkin Seeds", "White Buckwheat", "Flax", "Millet",
+                        "Hemp Seeds", "Corn", "Triticale", "Rye", "Long Grain Brown Rice",
+                        "Einkorn Wheat", "Emmer", "Durum", "Spelt", "Barley Flakes",
+                        "Khorasan Flakes", "Red Fife", "Chia Seeds",
+                        "White Quinoa", "Amaranth", "Sorghum", "Poppy Seed", "Teff Seed"
+                    ]
+                },
+                {
+                    name: "Wegmans 27 Grain Sandwich Bread",
+                    ingredients: [
+                        "Whole Wheat Flour", "Brown Flax Seed", "Sunflower Seeds", "Oats",
+                        "Hemp Seeds", "Pumpkin Seeds", "Triticale", "Millet", "Buckwheat",
+                        "Rye", "Yellow Corn", "Golden Flax", "Red Quinoa", "Chia Seeds",
+                        "Spelt", "Brown Rice", "Barley", "White Quinoa", "Kharasan",
+                        "Amaranth", "Sorghum", "Poppy Seeds", "Einkorn Wheat",
+                        "Emmer", "Red Fife", "Durum Wheat", "Teff"
+                    ]
+                },
+                {
+                    name: "Naked 24 Grain Bread",
+                    ingredients: [
+                        "Oats", "Barley Flakes",
+                        "Triticale Flakes", "Soft White Wheat Flakes", "Rye Flakes", "Amaranth",
+                        "Brown Flax Seeds", "Corn Meal", "Red Wheat Bran", "Millet",
+                        "Sunflower Seeds", "Poppy Seeds", "Quinoa", "Black Quinoa", "Red Quinoa",
+                        "Pumpkin Seeds", "Chia Seeds", "Golden Flax", "Brown Rice", "Spelt Flakes",
+                        "Buckwheat Groats", "Khorasan Wheat Flakes", "Sorghum", "Durum Wheat Flour"
+                    ]
+                },
+                {
+                    name: "Brownberry 22 Grains & Seeds",
+                    ingredients: [
+                        "Whole Wheat", "Oats", "Rye", "Sunflower Seeds",
+                        "Brown Flaxseed", "Millet", "Pumpkin Seeds",
+                        "Flaxmeal", "Black Chia Seeds", "Khorasan Wheat",
+                        "Kaniwa Seeds", "Teff", "Brown Rice", "Buckwheat Flour", "Spelt Flour",
+                        "Amaranth", "Barley", "Blue Cornmeal", "Triticale", "Sorghum Flour",
+                        "Poppy Seeds", "Quinoa"
+                    ]
+                },
+                {
+                    name: "Trader Joe's 21 Grains & Seeds",
+                    ingredients: [
+                        "Whole Wheat", "Flax", "Millet", "Oats", "Quinoa", "Barley", "Rye",
+                        "Spelt", "Triticale", "Amaranth", "Corn", "Khorasan", "Buckwheat",
+                        "Purple Corn", "Brown Rice", "Sorghum", "Sunflower Seed", "Pumpkin Seed",
+                        "Black Sesame Seed", "White Sesame Seed", "Poppy Seed"
+                    ]
+                },
+                {
+                    name: "Dave's Killer Bread 21",
+                    ingredients: [
+                        "Whole Wheat", "Flax Seeds", "Sunflower Seeds", "Black Quinoa", "Red Quinoa",
+                        "White Quinoa", "Triticale", "Pumpkin Seeds", "Barley", "Rolled Oats", "Rye",
+                        "Blue Cornmeal", "Millet", "Spelt", "Brown Rice Flour", "Amaranth",
+                        "Yellow Cornmeal", "Khorasan Wheat", "Sorghum Flour", "Buckwheat Flour",
+                        "Poppy Seeds"
+                    ]
+                },
+                {
+                    name: "Desi Kitchen Multigrain",
+                    ingredients: [
+                        "Whole Wheat", "Split Chickpeas", "Sorghum", "Corn", "Flax Seeds", "Soya",
+                        "Oats", "Finger Millet", "Barley", "Psyllium Husk"
+                    ]
+                },
+                {
+                    name: "King Arthur Whole Grain Flour Blend",
+                    ingredients: [
+                        "White Whole Wheat", "Barley", "Pumpernickel", "Sorghum", "Oat",
+                        "Millet", "Amaranth", "Teff", "Quinoa"
+                    ]
+                },
+                {
+                    name: "Bob's Red Mill Paleo Baking Flour",
+                    ingredients: ["Almond", "Arrowroot", "Coconut", "Tapioca"]
+                },
+                {
+                    name: "The Big 16, by Silver Hills",
+                    ingredients: [
+                        "Whole Grain Wheat", "Oats", "Rolled Oats", "Flaxseeds", "Sunflower Seeds", "Millet",
+                        "Sprouted Khorasan", "Sprouted Barley", "Sprouted Rye", "Sprouted Buckwheat",
+                        "Sprouted Yellow Corn Flour", "Sprouted Brown Rice Flour", "Amaranth",
+                        "Quinoa", "Sesame Seeds", "Sprouted Spelt Flour"
+                    ]
+                },
+                {
+                    name: "Reno's House of Bread",
+                    ingredients: [
+                        "Whole Wheat Flour", "Cracked Hard Wheat", "Soft Wheat", "Oats", "Barley",
+                        "Triticale", "Rye", "Millet", "Sunflower Seeds", "Sesame Seeds",
+                        "Poppy Seeds", "Pumpkin Seeds", "Flax Seeds"
+                    ]
+                },
+                {
+                    name: "King Arthur Harvest Grains Blend",
+                    ingredients: [
+                        "Whole Oat Berries", "Millet", "Rye Flakes", "Wheat Flakes",
+                        "Flax", "Poppy", "Sesame", "Sunflower"
+                    ]
+                },
+                {
+                    name: "Simple Truth 20 Grains & Seeds",
+                    ingredients: [
+                        "Whole Wheat Flour", "Brown Flaxseed", "Brown Flaxmeal", "Oats", "Triticale",
+                        "Barley", "Brown Rice", "Buckwheat", "Hulled Millet",
+                        "Pumpkin Seeds", "Rye", "Spelt", "Sunflower Seeds", "Yellow Corn",
+                        "Amaranth", "Blue Corn", "Poppy Seed", "Quinoa", "White Sorghum",
+                        "Yellow Flaxseed"
+                    ]
+                },
+                {
+                    name: "Open Nature 19 Grain",
+                    ingredients: [
+                        "Wheat Flour", "Flax Seeds", "Millet", "Spelt Flakes",
+                        "Khorasan Flakes", "Oats", "Sunflower Seeds", "Rye", "Triticale", "Barley",
+                        "Corn Meal", "Sesame Seeds", "Brown Rice", "Sorghum", "Quinoa", "Teff",
+                        "Amaranth", "Buckwheat", "Chia Seeds"
+                    ]
+                },
+                {
+                    name: "Nature's Harvest 18 Grains & Seeds",
+                    ingredients: [
+                        "Whole Wheat Flour", "Malted Barley", "Rye", "Oats", "Corn",
+                        "Triticale", "Millet", "Brown Rice", "Buckwheat", "Sorghum", "Spelt",
+                        "Amaranth", "Quinoa", "Teff", "Sunflower Seeds", "Sesame Seeds",
+                        "Flaxseed", "Poppy Seeds"
+                    ]
+                },
+                {
+                    name: "Firebrand Sprouted 18 Grains & Seeds",
+                    ingredients: [
+                        "Whole Wheat Flour", "Buckwheat Groats", "Millet",
+                        "Flax", "Oats", "Barley", "Rye", "Triticale", "Corn", "Brown Rice", "Spelt",
+                        "Quinoa", "Khorasan Wheat", "Amaranth", "Sunflower Seeds",
+                        "Sesame Seeds", "Oats", "Pumpkin Seeds"
+                    ]
+                },
+                {
+                    name: "Genesis 1:29 Sprouted Grain and Seed Bread",
+                    ingredients: [
+                        "Sprouted Amaranth", "Sprouted Barley", "Sprouted Brown Rice",
+                        "Sprouted Chia Seeds", "Sprouted Corn", "Sprouted Flax Seed",
+                        "Sprouted Millet", "Pumpkin Seeds", "Sprouted Quinoa", "Sprouted Rye",
+                        "Sesame Seeds", "Sprouted Soybeans", "Sprouted Spelt", "Sunflower Seeds",
+                        "Sprouted Teff", "Sprouted Wheat"
+                    ]
+                },
+                {
+                    name: "Pepperidge Farm 15 Grain",
+                    ingredients: [
+                        "Whole Wheat Flour", "Sunflower Seeds", "Flaxseed", "Oats",
+                        "Barley", "Rye", "Triticale", "Corn Grits", "Buckwheat", "Millet",
+                        "Amaranth", "Brown Rice Meal", "Quinoa", "Sorghum", "Spelt"
+                    ]
+                },
+                {
+                    name: "Country Harvest 14 Grains",
+                    ingredients: [
+                        "Whole Wheat Flour", "Flax Seeds", "Oats", "Sunflower Seeds",
+                        "Barley", "Rye", "Corn Meal", "Triticale",
+                        "Brown Rice", "Millet", "Quinoa", "Teff", "Farro", "Pumpkin Seeds",
+                        "Buckwheat"
+                    ]
+                },
+                {
+                    name: "Softgrain Treize",
+                    ingredients: [
+                        "Oats", "Sunflower Seeds", "Flax Seeds", "Millet",
+                        "Soya Grits", "Sprouted Buckwheat", "Barley", "Cracked Sorghum", "Teff",
+                        "Poppy Seeds", "Sprouted Wheat", "Sprouted Rye", "Sprouted Triticale"
+                    ]
+                },
+                {
+                    name: "King Arthur Super 10 Blend",
+                    ingredients: [
+                        "Spelt", "Millet", "Rye", "Barley", "Quinoa", "Chia Seed", "Amaranth",
+                        "Teff", "Buckwheat", "Sorghum"
+                    ]
+                },
+                {
+                    name: "Unpretentious 9 Grain Flour",
+                    ingredients: [
+                        "Hard Red Wheat", "Oat Groats", "Triticale Berries", "Rye Berries",
+                        "Dehulled Barley", "Soft White Wheat", "Spelt Berries", "Hard White Wheat",
+                        "Flax"
+                    ]
+                }
+            ];
+
+            function checkedValues(containerId) {
+                var container = document.getElementById(containerId);
+                return Array.from(container.querySelectorAll("input[type=checkbox]"))
+                    .filter(function (cb) { return cb.checked && cb.value; })
+                    .map(function (cb) { return cb.value; });
+            }
+
+            var productsListEl = document.getElementById("products-list");
+
+            function renderProducts() {
+                products.forEach(function (product) {
+                    product.canonical = product.ingredients.map(canonicalGrainName);
+                    product.canonical.forEach(function (name, index) {
+                        if (!name) {
+                            console.warn('No grain mapping for "' + product.ingredients[index] + '" in ' + product.name + " -- add it as an alias in GRAINS.");
+                        }
+                    });
+
+                    var details = document.createElement("details");
+                    details.className = "product";
+
+                    var summary = document.createElement("summary");
+
+                    var count = document.createElement("span");
+                    count.className = "grain-count";
+                    summary.appendChild(count);
+
+                    var nameEl = document.createElement("span");
+                    nameEl.className = "product-name";
+                    nameEl.appendChild(document.createTextNode(product.name + " "));
+
+                    var total = document.createElement("span");
+                    total.className = "product-total";
+                    nameEl.appendChild(total);
+                    summary.appendChild(nameEl);
+
+                    details.appendChild(summary);
+
+                    var list = document.createElement("ul");
+                    list.className = "ingredients";
+                    product.ingredients.forEach(function (ingredient) {
+                        var li = document.createElement("li");
+                        li.textContent = ingredient;
+                        list.appendChild(li);
+                    });
+                    details.appendChild(list);
+
+                    productsListEl.appendChild(details);
+                    product.el = details;
+                    product.countEl = count;
+                    product.totalEl = total;
+                });
+            }
+
+            function updateProducts() {
+                var mustHave = checkedValues("must-have-list");
+                var mustNotHave = checkedValues("must-not-have-list");
+                var grainTerms = checkedValues("counts-as-grain-list");
+
+                products.forEach(function (product) {
+                    var hasAllMustHave = mustHave.every(function (term) {
+                        return product.canonical.indexOf(term) !== -1;
+                    });
+                    var hasAnyMustNotHave = mustNotHave.some(function (term) {
+                        return product.canonical.indexOf(term) !== -1;
+                    });
+                    var grainCount = product.canonical.filter(function (name) {
+                        return name && grainTerms.indexOf(name) !== -1;
+                    }).length;
+
+                    product.grainCount = grainCount;
+                    product.visible = hasAllMustHave && !hasAnyMustNotHave;
+                    product.countEl.textContent = grainCount;
+                    product.totalEl.textContent = "(listed " + product.ingredients.length + " ingredients)";
+                    product.el.style.display = product.visible ? "" : "none";
+                });
+
+                products
+                    .slice()
+                    .sort(function (a, b) { return b.grainCount - a.grainCount; })
+                    .forEach(function (product) {
+                        productsListEl.appendChild(product.el);
+                    });
+            }
+
+
+            renderProducts();
+            updateProducts();
+            document.addEventListener("change", function (e) {
+                if (e.target.matches("#must-have-list input, #must-not-have-list input, #counts-as-grain-list input")) {
+                    updateProducts();
+                }
+            });
+        </script>
+    </body>
+</html>

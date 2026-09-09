@@ -10,7 +10,7 @@ Videos should be:
 - different topics from what you've seen before
 - accessible when you're new to the topic... interesting and engaging if you're already familiar
 - preferring archived photos and sources over surface-level summary or AI content
-- uploaded with subtitles
+- posted with subtitles
 - maybe not your favorite every time, but worthwhile if the video works for one person
 
 ## Recent Video
